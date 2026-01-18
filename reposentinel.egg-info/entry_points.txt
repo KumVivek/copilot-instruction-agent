@@ -1,0 +1,2 @@
+[console_scripts]
+reposentinel = cmd.reposentinel.main:cli

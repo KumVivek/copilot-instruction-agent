@@ -73,8 +73,28 @@ class LLMClient:
             return instructions or ""
             
         except Exception as e:
-            logger.error(f"Failed to generate instructions: {e}")
-            raise RuntimeError(f"LLM API call failed: {e}") from e
+            error_msg = str(e)
+            
+            # Handle specific API errors with helpful messages
+            if "insufficient_quota" in error_msg or "429" in error_msg:
+                logger.error("OpenAI API quota exceeded. Please check your billing and plan.")
+                raise RuntimeError(
+                    "OpenAI API quota exceeded. Please:\n"
+                    "1. Check your OpenAI account billing and plan\n"
+                    "2. Visit https://platform.openai.com/account/billing\n"
+                    "3. Or use the --skip-llm flag to generate rules without AI instructions"
+                ) from e
+            elif "invalid_api_key" in error_msg or "401" in error_msg:
+                logger.error("Invalid OpenAI API key")
+                raise RuntimeError(
+                    "Invalid OpenAI API key. Please:\n"
+                    "1. Check your OPENAI_API_KEY environment variable\n"
+                    "2. Get a key from https://platform.openai.com/api-keys\n"
+                    "3. Or use the --skip-llm flag to skip AI generation"
+                ) from e
+            else:
+                logger.error(f"Failed to generate instructions: {e}")
+                raise RuntimeError(f"LLM API call failed: {e}") from e
     
     def _build_prompt(self, stack: Dict[str, Any], rules: List[str]) -> str:
         """Build the prompt for instruction generation."""

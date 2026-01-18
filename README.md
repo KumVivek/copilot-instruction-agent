@@ -34,8 +34,12 @@ pip install -e .
 # Set your OpenAI API key (optional, for guardrail generation)
 export OPENAI_API_KEY="your-api-key-here"
 
-# Analyze your repository
+# Analyze your repository (choose one method):
 reposentinel /path/to/your/repo
+# OR
+python3 -m cmd.reposentinel.main /path/to/your/repo
+# OR (if in project directory)
+./reposentinel /path/to/your/repo
 ```
 
 **That's it!** RepoSentinel will:

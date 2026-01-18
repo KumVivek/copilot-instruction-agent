@@ -2,8 +2,9 @@
 import sys
 import os
 import logging
+import argparse
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any, List
 
 from rich.console import Console
 from rich.panel import Panel
@@ -21,7 +22,7 @@ from core.report.writer import write_report
 
 console = Console()
 
-def main(repo: Optional[str] = None) -> int:
+def main(repo: Optional[str] = None, skip_llm: bool = False) -> int:
     """Main entry point for RepoSentinel.
     
     Args:
@@ -123,31 +124,60 @@ def main(repo: Optional[str] = None) -> int:
                 return 1
             
             # Generate Copilot instructions
-            task5 = progress.add_task("Generating Copilot instructions...", total=None)
-            try:
-                llm = LLMClient(config)
-                copilot_md = llm.generate_instructions(stack, rules)
-                progress.update(task5, completed=True)
-                console.print(f"[green]✓[/green] Generated Copilot instructions")
-            except Exception as e:
-                progress.update(task5, completed=True)
-                logger.error(f"Instruction generation failed: {e}", exc_info=True)
-                console.print(f"[red]✗[/red] Instruction generation failed: {e}")
-                return 1
+            if skip_llm:
+                logger.info("Skipping LLM generation (--skip-llm flag set)")
+                copilot_md = None
+                console.print(f"[yellow]⚠[/yellow] Skipped Copilot instructions generation")
+            else:
+                task5 = progress.add_task("Generating Copilot instructions...", total=None)
+                try:
+                    llm = LLMClient(config)
+                    copilot_md = llm.generate_instructions(stack, rules)
+                    progress.update(task5, completed=True)
+                    console.print(f"[green]✓[/green] Generated Copilot instructions")
+                except RuntimeError as e:
+                    progress.update(task5, completed=True)
+                    error_msg = str(e)
+                    if "quota" in error_msg.lower() or "api key" in error_msg.lower():
+                        console.print(f"[yellow]⚠[/yellow] {error_msg}")
+                        console.print("[yellow]Continuing without AI-generated instructions...[/yellow]")
+                        copilot_md = None
+                    else:
+                        logger.error(f"Instruction generation failed: {e}", exc_info=True)
+                        console.print(f"[red]✗[/red] Instruction generation failed: {e}")
+                        return 1
+                except Exception as e:
+                    progress.update(task5, completed=True)
+                    logger.error(f"Instruction generation failed: {e}", exc_info=True)
+                    console.print(f"[red]✗[/red] Instruction generation failed: {e}")
+                    return 1
         
         # Write outputs
         try:
-            # Write Copilot instructions
-            copilot_path = config.get("output.copilot_instructions_path", 
-                                     ".github/copilot-instructions.md")
-            copilot_file = Path(copilot_path)
-            copilot_file.parent.mkdir(parents=True, exist_ok=True)
-            
-            with open(copilot_file, "w", encoding="utf-8") as f:
-                f.write(copilot_md)
-            
-            logger.info(f"Copilot instructions written to {copilot_path}")
-            console.print(f"[green]✓[/green] Copilot instructions: {copilot_path}")
+            if copilot_md:
+                copilot_path = config.get("output.copilot_instructions_path", 
+                                         ".github/copilot-instructions.md")
+                copilot_file = Path(copilot_path)
+                copilot_file.parent.mkdir(parents=True, exist_ok=True)
+                
+                with open(copilot_file, "w", encoding="utf-8") as f:
+                    f.write(copilot_md)
+                
+                logger.info(f"Copilot instructions written to {copilot_path}")
+                console.print(f"[green]✓[/green] Copilot instructions: {copilot_path}")
+            else:
+                # Generate a basic instructions file from rules
+                copilot_path = config.get("output.copilot_instructions_path", 
+                                         ".github/copilot-instructions.md")
+                copilot_file = Path(copilot_path)
+                copilot_file.parent.mkdir(parents=True, exist_ok=True)
+                
+                basic_instructions = _generate_basic_instructions(stack, rules)
+                with open(copilot_file, "w", encoding="utf-8") as f:
+                    f.write(basic_instructions)
+                
+                logger.info(f"Basic Copilot instructions written to {copilot_path}")
+                console.print(f"[yellow]ℹ[/yellow] Basic instructions (without AI): {copilot_path}")
             
             # Write report
             write_report(stack, findings, risk, config)
@@ -186,10 +216,47 @@ def main(repo: Optional[str] = None) -> int:
         console.print(f"[red]Unexpected error: {e}[/red]")
         return 1
 
+def _generate_basic_instructions(stack: Dict[str, Any], rules: List[str]) -> str:
+    """Generate basic instructions without AI."""
+    language = stack.get("language", "Unknown")
+    rules_text = "\n".join(f"- {rule}" for rule in rules) if rules else "No specific rules generated."
+    
+    return f"""# GitHub Copilot Instructions
+
+## Technology Stack
+- **Language**: {language}
+- **Confidence**: {stack.get('confidence', 0):.0%}
+
+## Rules and Constraints
+
+{rules_text}
+
+## Notes
+
+This file was generated automatically by RepoSentinel.
+For AI-enhanced instructions, set your OPENAI_API_KEY and run without --skip-llm flag.
+"""
+
 def cli():
     """CLI entry point for setuptools."""
-    repo = sys.argv[1] if len(sys.argv) > 1 else None
-    sys.exit(main(repo))
+    parser = argparse.ArgumentParser(
+        description="RepoSentinel - Generate GitHub Copilot guardrails",
+        prog="reposentinel"
+    )
+    parser.add_argument(
+        "repo",
+        nargs="?",
+        help="Path to repository to analyze (default: current directory)"
+    )
+    parser.add_argument(
+        "--skip-llm",
+        action="store_true",
+        help="Skip AI-generated instructions (useful if API quota exceeded)"
+    )
+    
+    args = parser.parse_args()
+    repo = args.repo if args.repo else None
+    sys.exit(main(repo, skip_llm=args.skip_llm))
 
 if __name__ == "__main__":
     cli()
