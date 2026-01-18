@@ -1,6 +1,5 @@
 """Generator for categorized Copilot instruction files."""
 import logging
-from pathlib import Path
 from typing import Dict, List, Any, Optional
 
 from core.best_practices.loader import BestPracticesLoader
