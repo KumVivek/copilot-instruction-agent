@@ -10,7 +10,8 @@ def write_report(
     stack: Dict[str, Any],
     findings: List[Dict[str, Any]],
     risk: Dict[str, float],
-    config: Config
+    config: Config,
+    repo_path: str = "."
 ) -> None:
     """Write analysis report to markdown file.
     
@@ -19,16 +20,20 @@ def write_report(
         findings: List of findings
         risk: Risk scores by category
         config: Configuration instance
+        repo_path: Path to the repository being analyzed (default: current directory)
     
     Raises:
         IOError: If report file cannot be written
     """
     report_path = config.get("output.report_path", "analysis-report.md")
+    # Resolve path relative to the repository being analyzed
+    repo = Path(repo_path).resolve()
+    report_file = repo / report_path
     
     try:
-        logger.info(f"Writing analysis report to {report_path}")
+        logger.info(f"Writing analysis report to {report_file}")
         
-        with open(report_path, "w", encoding="utf-8") as f:
+        with open(report_file, "w", encoding="utf-8") as f:
             f.write("# RepoSentinel Analysis Report\n\n")
             
             # Stack information
@@ -91,7 +96,7 @@ def write_report(
             else:
                 f.write("No critical issues detected. Continue monitoring code quality.\n")
         
-        logger.info(f"Report written successfully to {report_path}")
+        logger.info(f"Report written successfully to {report_file}")
         
     except IOError as e:
         logger.error(f"Failed to write report: {e}")

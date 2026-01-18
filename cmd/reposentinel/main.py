@@ -152,37 +152,43 @@ def main(repo: Optional[str] = None, skip_llm: bool = False) -> int:
                     console.print(f"[red]✗[/red] Instruction generation failed: {e}")
                     return 1
         
-        # Write outputs
+        # Write outputs to the analyzed repository
         try:
+            # Resolve repository path
+            repo = Path(repo).resolve()
+            
             if copilot_md:
                 copilot_path = config.get("output.copilot_instructions_path", 
                                          ".github/copilot-instructions.md")
-                copilot_file = Path(copilot_path)
+                # Resolve path relative to the repository being analyzed
+                copilot_file = repo / copilot_path
                 copilot_file.parent.mkdir(parents=True, exist_ok=True)
                 
                 with open(copilot_file, "w", encoding="utf-8") as f:
                     f.write(copilot_md)
                 
-                logger.info(f"Copilot instructions written to {copilot_path}")
-                console.print(f"[green]✓[/green] Copilot instructions: {copilot_path}")
+                logger.info(f"Copilot instructions written to {copilot_file}")
+                console.print(f"[green]✓[/green] Copilot instructions: {copilot_file}")
             else:
                 # Generate a basic instructions file from rules
                 copilot_path = config.get("output.copilot_instructions_path", 
                                          ".github/copilot-instructions.md")
-                copilot_file = Path(copilot_path)
+                # Resolve path relative to the repository being analyzed
+                copilot_file = repo / copilot_path
                 copilot_file.parent.mkdir(parents=True, exist_ok=True)
                 
                 basic_instructions = _generate_basic_instructions(stack, rules)
                 with open(copilot_file, "w", encoding="utf-8") as f:
                     f.write(basic_instructions)
                 
-                logger.info(f"Basic Copilot instructions written to {copilot_path}")
-                console.print(f"[yellow]ℹ[/yellow] Basic instructions (without AI): {copilot_path}")
+                logger.info(f"Basic Copilot instructions written to {copilot_file}")
+                console.print(f"[yellow]ℹ[/yellow] Basic instructions (without AI): {copilot_file}")
             
-            # Write report
-            write_report(stack, findings, risk, config)
+            # Write report to the analyzed repository
+            write_report(stack, findings, risk, config, str(repo))
             report_path = config.get("output.report_path", "analysis-report.md")
-            console.print(f"[green]✓[/green] Analysis report: {report_path}")
+            report_file = repo / report_path
+            console.print(f"[green]✓[/green] Analysis report: {report_file}")
             
         except Exception as e:
             logger.error(f"Failed to write outputs: {e}", exc_info=True)
