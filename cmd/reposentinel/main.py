@@ -1,7 +1,5 @@
 """Main entry point for RepoSentinel."""
 import sys
-import os
-import logging
 import argparse
 from pathlib import Path
 from typing import Optional, Dict, Any, List
