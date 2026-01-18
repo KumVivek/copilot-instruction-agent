@@ -97,6 +97,16 @@ class Config:
                 return default
         return value
     
+    def set(self, key: str, value: Any) -> None:
+        """Set configuration value using dot notation."""
+        keys = key.split(".")
+        config = self._config
+        for k in keys[:-1]:
+            if k not in config:
+                config[k] = {}
+            config = config[k]
+        config[keys[-1]] = value
+    
     def __getitem__(self, key: str) -> Any:
         """Allow dictionary-style access."""
         return self.get(key)

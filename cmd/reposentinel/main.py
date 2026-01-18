@@ -21,11 +21,14 @@ from core.instructions.generator import InstructionGenerator
 
 console = Console()
 
-def main(repo: Optional[str] = None, skip_llm: bool = False) -> int:
+def main(repo: Optional[str] = None, skip_llm: bool = False, model: Optional[str] = None) -> int:
     """Main entry point for RepoSentinel.
     
     Args:
         repo: Optional repository path. If not provided, uses current directory.
+        skip_llm: If True, skip LLM generation and use basic instructions.
+        model: Optional OpenAI model name to use (e.g., "gpt-4", "gpt-4o", "gpt-4-turbo").
+               If not provided, uses value from config file.
     
     Returns:
         Exit code (0 for success, non-zero for errors)
@@ -130,10 +133,17 @@ def main(repo: Optional[str] = None, skip_llm: bool = False) -> int:
             else:
                 task5 = progress.add_task("Generating categorized Copilot instructions...", total=None)
                 try:
+                    logger.info("🤖 Initializing OpenAI LLM client...")
+                    # Override model if provided via CLI
+                    if model:
+                        logger.info(f"🤖 Using model from CLI: {model}")
+                        config.set("llm.model", model)
                     llm = LLMClient(config)
+                    logger.info(f"🤖 Making API calls to OpenAI for {len(['design', 'api', 'security', 'data-access', 'testing', 'logging'])} categories...")
                     categorized_instructions = llm.generate_instructions(stack, rules, findings)
                     progress.update(task5, completed=True)
-                    console.print(f"[green]✓[/green] Generated {len(categorized_instructions)} instruction file(s)")
+                    console.print(f"[green]✓[/green] Generated {len(categorized_instructions)} AI-powered instruction file(s)")
+                    logger.info(f"✅ Successfully generated {len(categorized_instructions)} AI instruction files")
                 except RuntimeError as e:
                     progress.update(task5, completed=True)
                     error_msg = str(e)
@@ -281,10 +291,17 @@ def cli():
         action="store_true",
         help="Skip AI-generated instructions (useful if API quota exceeded)"
     )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="OpenAI model to use (e.g., 'gpt-4', 'gpt-4o', 'gpt-4-turbo', 'gpt-4o-mini'). "
+             "Defaults to value in config file or 'gpt-4o-mini'"
+    )
     
     args = parser.parse_args()
     repo = args.repo if args.repo else None
-    sys.exit(main(repo, skip_llm=args.skip_llm))
+    sys.exit(main(repo, skip_llm=args.skip_llm, model=args.model))
 
 if __name__ == "__main__":
     cli()

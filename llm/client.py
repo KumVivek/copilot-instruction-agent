@@ -30,7 +30,9 @@ class LLMClient:
         self.temperature = config.get("llm.temperature", 0.3)
         self.max_tokens = config.get("llm.max_tokens", 2000)
         
-        logger.debug(f"Initialized LLM client with model: {self.model}")
+        logger.info(f"🤖 LLM Client initialized with model: {self.model}")
+        logger.info(f"   API Key: {'✅ Set' if self.key else '❌ Not set'}")
+        logger.debug(f"   Temperature: {self.temperature}, Max tokens: {self.max_tokens}")
 
     def generate_instructions(
         self, 
@@ -72,7 +74,10 @@ class LLMClient:
             try:
                 prompt = self._build_category_prompt(category, stack, rules, findings)
                 
-                logger.info(f"Generating {category} instructions using {self.model}")
+                logger.info(f"🤖 Making OpenAI API call for {category} category using {self.model}")
+                logger.debug(f"API Key present: {bool(self.key)}")
+                logger.debug(f"Prompt length: {len(prompt)} characters")
+                
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=[
@@ -89,10 +94,19 @@ class LLMClient:
                     max_tokens=self.max_tokens,
                 )
                 
+                # Log API usage information
+                usage = getattr(response, 'usage', None)
+                if usage:
+                    logger.info(f"✅ API call successful for {category}: {usage.total_tokens} tokens used")
+                else:
+                    logger.info(f"✅ API call successful for {category}")
+                
                 category_instructions = response.choices[0].message.content
                 if category_instructions:
                     instructions[category] = category_instructions
-                    logger.debug(f"Generated {category} instructions")
+                    logger.info(f"✅ Generated {category} instructions ({len(category_instructions)} chars)")
+                else:
+                    logger.warning(f"⚠️ Empty response for {category}")
             except Exception as e:
                 error_msg = str(e)
                 # Handle specific API errors
