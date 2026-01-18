@@ -1,0 +1,153 @@
+# .NET Best Practices for RepoSentinel
+# These practices are used to evaluate code and generate guardrails
+
+patterns:
+  # Architecture Patterns
+  - id: "ARCH-001"
+    name: "Controller accessing DbContext directly"
+    type: "anti-pattern"
+    severity: "HIGH"
+    category: "Architecture"
+    description: "Controllers should not directly access DbContext. Use repository pattern or service layer."
+    regex: "(class\\s+\\w+Controller[^{]*\\{[^}]*DbContext)"
+    constraint: "Controllers must not access DbContext directly. Use repository pattern or service layer."
+  
+  - id: "ARCH-002"
+    name: "Business logic in controllers"
+    type: "anti-pattern"
+    severity: "MEDIUM"
+    category: "Architecture"
+    description: "Controllers should be thin and delegate business logic to services."
+    regex: "(class\\s+\\w+Controller[^{]*\\{[^}]{500,})"
+    constraint: "Keep controllers thin - only handle HTTP concerns. Move business logic to service classes."
+  
+  - id: "ARCH-003"
+    name: "Direct instantiation of services"
+    type: "anti-pattern"
+    severity: "MEDIUM"
+    category: "Architecture"
+    description: "Services should be injected via DI, not instantiated directly."
+    regex: "new\\s+(Service|Repository|Manager|Handler|Factory)\\w*\\s*\\("
+    constraint: "Use dependency injection instead of 'new' keyword for services. Register services in DI container."
+  
+  - id: "ARCH-004"
+    name: "Static service location"
+    type: "anti-pattern"
+    severity: "HIGH"
+    category: "Architecture"
+    description: "Avoid ServiceLocator pattern and static dependency resolution."
+    regex: "(ServiceLocator\\.|DependencyResolver\\.|HttpContext\\.Current\\.)"
+    constraint: "Avoid ServiceLocator and static dependency resolution. Use constructor injection for all dependencies."
+  
+  # Security Patterns
+  - id: "SEC-001"
+    name: "SQL injection vulnerability"
+    type: "anti-pattern"
+    severity: "CRITICAL"
+    category: "Security"
+    description: "String concatenation in SQL queries can lead to SQL injection."
+    regex: "(SqlCommand|SqlQuery|ExecuteSql|FromSqlRaw|FromSqlInterpolated).*\\+.*['\"]"
+    constraint: "Never use string concatenation in SQL queries. Use parameterized queries or Entity Framework LINQ."
+  
+  - id: "SEC-002"
+    name: "Hardcoded connection strings"
+    type: "anti-pattern"
+    severity: "HIGH"
+    category: "Security"
+    description: "Connection strings should be in configuration, not hardcoded."
+    regex: "(new\\s+SqlConnection|ConnectionString\\s*=\\s*[\"'][^\"']{10,}[\"'])"
+    constraint: "Never hardcode connection strings. Use configuration files or environment variables."
+  
+  - id: "SEC-003"
+    name: "Missing input validation"
+    type: "anti-pattern"
+    severity: "MEDIUM"
+    category: "Security"
+    description: "Public API endpoints should validate input parameters."
+    regex: "(public\\s+(async\\s+)?(I)?ActionResult\\s+\\w+\\s*\\([^)]*\\)\\s*\\{[^}]*return)"
+    constraint: "Always validate input parameters in API endpoints. Use data annotations or FluentValidation."
+  
+  # Code Quality Patterns
+  - id: "QUAL-001"
+    name: "Large methods"
+    type: "anti-pattern"
+    severity: "LOW"
+    category: "Code Quality"
+    description: "Methods should be small and focused (ideally under 50 lines)."
+    regex: "(public\\s+.*\\{[^}]{500,}\\})"
+    constraint: "Keep methods small and focused. Extract complex logic into separate methods or classes."
+  
+  - id: "QUAL-002"
+    name: "Missing async/await"
+    type: "anti-pattern"
+    severity: "MEDIUM"
+    category: "Code Quality"
+    description: "I/O operations should be async to avoid blocking threads."
+    regex: "(HttpClient|Database|File\\.(Read|Write)).*\\."
+    constraint: "Use async/await for all I/O operations. Never use .Result or .Wait() on async methods."
+  
+  - id: "QUAL-003"
+    name: "Magic numbers"
+    type: "anti-pattern"
+    severity: "LOW"
+    category: "Code Quality"
+    description: "Magic numbers should be replaced with named constants."
+    regex: "\\b(\\d{3,})\\b"
+    constraint: "Replace magic numbers with named constants or configuration values."
+
+rules:
+  - "Follow SOLID principles in all code"
+  - "Use dependency injection for all dependencies"
+  - "Keep controllers thin - only handle HTTP concerns"
+  - "Use async/await for all I/O operations"
+  - "Validate all input parameters"
+  - "Use Entity Framework LINQ instead of raw SQL when possible"
+  - "Never expose sensitive data in error messages"
+  - "Use strongly-typed configuration classes"
+  - "Implement proper error handling and logging"
+  - "Use cancellation tokens in async methods"
+
+constraints:
+  - "Controllers must not contain business logic"
+  - "Services must be registered in the DI container"
+  - "All database operations must use async methods"
+  - "API endpoints must validate input using data annotations"
+  - "Never use .Result or .Wait() on async methods"
+  - "Connection strings must be in appsettings.json"
+  - "Use repository pattern for data access"
+  - "Error messages must not expose sensitive information"
+  - "Use ILogger for all logging operations"
+  - "All public methods must have XML documentation comments"
+
+categories:
+  architecture:
+    description: "Architectural patterns and design principles"
+    practices:
+      - "Use layered architecture (Controllers -> Services -> Repositories)"
+      - "Implement repository pattern for data access"
+      - "Use dependency injection throughout"
+      - "Keep controllers thin"
+  
+  security:
+    description: "Security best practices"
+    practices:
+      - "Validate all input"
+      - "Use parameterized queries"
+      - "Store secrets in configuration"
+      - "Implement proper authentication and authorization"
+  
+  performance:
+    description: "Performance optimization practices"
+    practices:
+      - "Use async/await for I/O"
+      - "Implement caching where appropriate"
+      - "Use pagination for large datasets"
+      - "Optimize database queries"
+  
+  code_quality:
+    description: "Code quality and maintainability"
+    practices:
+      - "Keep methods small and focused"
+      - "Use meaningful variable names"
+      - "Avoid code duplication"
+      - "Write unit tests for business logic"

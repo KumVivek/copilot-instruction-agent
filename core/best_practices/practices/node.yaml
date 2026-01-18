@@ -1,0 +1,58 @@
+# Node.js/JavaScript Best Practices for RepoSentinel
+
+patterns:
+  - id: "ARCH-001"
+    name: "Callback hell"
+    type: "anti-pattern"
+    severity: "MEDIUM"
+    category: "Architecture"
+    description: "Nested callbacks should be replaced with async/await or Promises."
+    regex: "(\\w+\\([^)]*,\\s*function\\s*\\([^)]*\\)\\s*\\{[^}]*\\w+\\([^)]*,\\s*function)"
+    constraint: "Use async/await or Promises instead of nested callbacks."
+  
+  - id: "SEC-001"
+    name: "SQL injection vulnerability"
+    type: "anti-pattern"
+    severity: "CRITICAL"
+    category: "Security"
+    description: "String concatenation in SQL queries can lead to SQL injection."
+    regex: "(query|execute|db\\.(query|execute)).*\\+.*['\"]"
+    constraint: "Use parameterized queries. Never concatenate user input into SQL strings."
+  
+  - id: "SEC-002"
+    name: "Hardcoded secrets"
+    type: "anti-pattern"
+    severity: "HIGH"
+    category: "Security"
+    description: "Secrets should be in environment variables, not hardcoded."
+    regex: "(password|secret|api[_-]?key|token)\\s*[:=]\\s*['\"][^'\"]{8,}['\"]"
+    constraint: "Store secrets in environment variables. Use dotenv or similar for configuration."
+
+rules:
+  - "Use async/await instead of callbacks"
+  - "Always validate input parameters"
+  - "Use environment variables for configuration"
+  - "Implement proper error handling"
+  - "Use TypeScript for type safety"
+
+constraints:
+  - "Never commit secrets to version control"
+  - "Use parameterized database queries"
+  - "Validate all user input"
+  - "Use async/await for asynchronous operations"
+
+categories:
+  architecture:
+    description: "Node.js architectural patterns"
+    practices:
+      - "Use async/await"
+      - "Implement proper error handling"
+      - "Use middleware for cross-cutting concerns"
+  
+  security:
+    description: "Security best practices"
+    practices:
+      - "Validate all input"
+      - "Use environment variables for secrets"
+      - "Implement rate limiting"
+      - "Use HTTPS in production"

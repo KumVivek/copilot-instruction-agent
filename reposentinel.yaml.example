@@ -1,0 +1,31 @@
+# RepoSentinel Configuration Example
+# Copy this file to reposentinel.yaml and customize as needed
+
+# Output configuration
+output:
+  copilot_instructions_path: ".github/copilot-instructions.md"
+  report_path: "analysis-report.md"
+
+# LLM configuration
+llm:
+  model: "gpt-4o-mini"  # or "gpt-4", "gpt-3.5-turbo", etc.
+  temperature: 0.3  # Lower = more deterministic
+  max_tokens: 2000
+
+# Risk scoring configuration
+risk:
+  base_score: 10  # Starting risk score (higher is better)
+  decrement_per_finding: 1  # Base penalty per finding
+  critical_threshold: 5  # Score below this triggers rule generation
+
+# Analyzer configuration
+analyzers:
+  enabled:
+    - architecture
+    - security
+    - performance
+
+# Logging configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "rich"  # "rich" for pretty output, "plain" for simple

@@ -1,0 +1,41 @@
+# Python Best Practices for RepoSentinel
+
+patterns:
+  - id: "QUAL-001"
+    name: "Missing type hints"
+    type: "anti-pattern"
+    severity: "LOW"
+    category: "Code Quality"
+    description: "Functions should have type hints for better code clarity."
+    regex: "(def\\s+\\w+\\s*\\([^)]*\\)\\s*:)"
+    constraint: "Add type hints to all function signatures."
+  
+  - id: "SEC-001"
+    name: "SQL injection vulnerability"
+    type: "anti-pattern"
+    severity: "CRITICAL"
+    category: "Security"
+    description: "String formatting in SQL queries can lead to SQL injection."
+    regex: "(execute|query).*%[sd]|execute.*format"
+    constraint: "Use parameterized queries. Never use string formatting in SQL."
+
+rules:
+  - "Follow PEP 8 style guide"
+  - "Use type hints"
+  - "Implement proper error handling"
+  - "Use virtual environments"
+
+constraints:
+  - "Use type hints for all function parameters and return types"
+  - "Never use eval() or exec() with user input"
+  - "Use parameterized database queries"
+  - "Validate all input parameters"
+
+categories:
+  code_quality:
+    description: "Python code quality"
+    practices:
+      - "Follow PEP 8"
+      - "Use type hints"
+      - "Write docstrings"
+      - "Use virtual environments"

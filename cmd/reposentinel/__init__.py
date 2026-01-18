@@ -1,0 +1,1 @@
+"""RepoSentinel CLI entry point."""
