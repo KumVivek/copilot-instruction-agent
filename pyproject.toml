@@ -1,8 +1,41 @@
 [project]
 name = "reposentinel"
 version = "1.0.0"
-description = "Repo intelligence engine for Copilot guardrails"
+description = "Production-grade repo intelligence engine that generates enforceable GitHub Copilot guardrails"
+readme = "docs/README.md"
 requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "RepoSentinel Contributors"}
+]
+keywords = [
+    "github-copilot",
+    "code-analysis",
+    "static-analysis",
+    "best-practices",
+    "guardrails",
+    "code-quality",
+    "security",
+    "architecture",
+    "dotnet",
+    "python",
+    "nodejs",
+    "code-review",
+    "ai-assistant",
+    "developer-tools"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "openai>=1.0.0",
     "pyyaml>=6.0",
@@ -10,6 +43,13 @@ dependencies = [
     "rich>=13.0.0",
     "tree-sitter-languages>=1.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/copilot-instruction-agent"
+Documentation = "https://github.com/yourusername/copilot-instruction-agent/blob/main/docs/README.md"
+Repository = "https://github.com/yourusername/copilot-instruction-agent"
+Issues = "https://github.com/yourusername/copilot-instruction-agent/issues"
+Changelog = "https://github.com/yourusername/copilot-instruction-agent/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [

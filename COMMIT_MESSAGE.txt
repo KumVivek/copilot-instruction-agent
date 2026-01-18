@@ -1,0 +1,45 @@
+feat: prepare project for open source release
+
+Add comprehensive open source infrastructure including legal documents,
+community guidelines, GitHub templates, and enhanced documentation to
+maximize project visibility and community engagement.
+
+BREAKING CHANGES: None
+
+Legal & Governance:
+- Add MIT License (LICENSE)
+- Add Contributor Covenant Code of Conduct (CODE_OF_CONDUCT.md)
+- Add comprehensive Contributing Guide (CONTRIBUTING.md)
+
+Documentation:
+- Enhance main README with badges, quick start, and better formatting
+- Update docs/README.md with improved structure and links
+- Add marketing strategy guide (MARKETING.md)
+- Add open source setup guide (OPEN_SOURCE_SETUP.md)
+
+GitHub Integration:
+- Add bug report issue template (.github/ISSUE_TEMPLATE/bug_report.md)
+- Add feature request issue template (.github/ISSUE_TEMPLATE/feature_request.md)
+- Add pull request template (.github/pull_request_template.md)
+- Add CI/CD workflow for automated testing (.github/workflows/ci.yml)
+
+Project Metadata:
+- Enhance pyproject.toml with:
+  * Comprehensive keywords for discoverability
+  * PyPI classifiers
+  * Project URLs (homepage, docs, repository, issues)
+  * Better description and metadata
+  * License information
+
+This commit prepares RepoSentinel for public release with:
+- Professional open source documentation
+- Community contribution guidelines
+- Automated CI/CD pipeline
+- SEO-optimized metadata
+- Marketing strategy documentation
+
+The project is now ready for:
+- GitHub publication
+- PyPI distribution
+- Community contributions
+- Maximum visibility and discoverability
