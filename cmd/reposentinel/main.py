@@ -19,6 +19,7 @@ from core.risk.scorer import score
 from core.rules.builder import build_rules
 from llm.client import LLMClient
 from core.report.writer import write_report
+from core.instructions.generator import InstructionGenerator
 
 console = Console()
 
@@ -123,25 +124,25 @@ def main(repo: Optional[str] = None, skip_llm: bool = False) -> int:
                 console.print(f"[red]✗[/red] Rule building failed: {e}")
                 return 1
             
-            # Generate Copilot instructions
+            # Generate Copilot instructions (categorized)
             if skip_llm:
                 logger.info("Skipping LLM generation (--skip-llm flag set)")
-                copilot_md = None
-                console.print(f"[yellow]⚠[/yellow] Skipped Copilot instructions generation")
+                categorized_instructions = None
+                console.print(f"[yellow]⚠[/yellow] Skipped AI-generated instructions")
             else:
-                task5 = progress.add_task("Generating Copilot instructions...", total=None)
+                task5 = progress.add_task("Generating categorized Copilot instructions...", total=None)
                 try:
                     llm = LLMClient(config)
-                    copilot_md = llm.generate_instructions(stack, rules)
+                    categorized_instructions = llm.generate_instructions(stack, rules, findings)
                     progress.update(task5, completed=True)
-                    console.print(f"[green]✓[/green] Generated Copilot instructions")
+                    console.print(f"[green]✓[/green] Generated {len(categorized_instructions)} instruction file(s)")
                 except RuntimeError as e:
                     progress.update(task5, completed=True)
                     error_msg = str(e)
                     if "quota" in error_msg.lower() or "api key" in error_msg.lower():
                         console.print(f"[yellow]⚠[/yellow] {error_msg}")
                         console.print("[yellow]Continuing without AI-generated instructions...[/yellow]")
-                        copilot_md = None
+                        categorized_instructions = None
                     else:
                         logger.error(f"Instruction generation failed: {e}", exc_info=True)
                         console.print(f"[red]✗[/red] Instruction generation failed: {e}")
@@ -156,33 +157,56 @@ def main(repo: Optional[str] = None, skip_llm: bool = False) -> int:
         try:
             # Resolve repository path
             repo = Path(repo).resolve()
+            github_dir = repo / ".github"
+            github_dir.mkdir(parents=True, exist_ok=True)
             
-            if copilot_md:
-                copilot_path = config.get("output.copilot_instructions_path", 
-                                         ".github/copilot-instructions.md")
-                # Resolve path relative to the repository being analyzed
-                copilot_file = repo / copilot_path
-                copilot_file.parent.mkdir(parents=True, exist_ok=True)
+            if categorized_instructions:
+                # Write categorized instruction files
+                category_titles = {
+                    "design": "Design & Architecture",
+                    "api": "API Development",
+                    "security": "Security",
+                    "data-access": "Data Access",
+                    "caching": "Caching",
+                    "testing": "Testing",
+                    "logging": "Logging",
+                }
                 
-                with open(copilot_file, "w", encoding="utf-8") as f:
-                    f.write(copilot_md)
-                
-                logger.info(f"Copilot instructions written to {copilot_file}")
-                console.print(f"[green]✓[/green] Copilot instructions: {copilot_file}")
+                for category, content in categorized_instructions.items():
+                    filename = f"copilot-instructions-{category}.md"
+                    instruction_file = github_dir / filename
+                    
+                    with open(instruction_file, "w", encoding="utf-8") as f:
+                        f.write(content)
+                    
+                    title = category_titles.get(category, category.title())
+                    logger.info(f"{title} instructions written to {instruction_file}")
+                    console.print(f"[green]✓[/green] {title}: {instruction_file}")
             else:
-                # Generate a basic instructions file from rules
-                copilot_path = config.get("output.copilot_instructions_path", 
-                                         ".github/copilot-instructions.md")
-                # Resolve path relative to the repository being analyzed
-                copilot_file = repo / copilot_path
-                copilot_file.parent.mkdir(parents=True, exist_ok=True)
+                # Generate basic categorized instructions without AI
+                generator = InstructionGenerator(stack.get("language", ""))
+                basic_instructions = generator.generate_all_instructions(stack, findings, rules)
                 
-                basic_instructions = _generate_basic_instructions(stack, rules)
-                with open(copilot_file, "w", encoding="utf-8") as f:
-                    f.write(basic_instructions)
+                category_titles = {
+                    "design": "Design & Architecture",
+                    "api": "API Development",
+                    "security": "Security",
+                    "data-access": "Data Access",
+                    "caching": "Caching",
+                    "testing": "Testing",
+                    "logging": "Logging",
+                }
                 
-                logger.info(f"Basic Copilot instructions written to {copilot_file}")
-                console.print(f"[yellow]ℹ[/yellow] Basic instructions (without AI): {copilot_file}")
+                for category, content in basic_instructions.items():
+                    filename = f"copilot-instructions-{category}.md"
+                    instruction_file = github_dir / filename
+                    
+                    with open(instruction_file, "w", encoding="utf-8") as f:
+                        f.write(content)
+                    
+                    title = category_titles.get(category, category.title())
+                    logger.info(f"Basic {title} instructions written to {instruction_file}")
+                    console.print(f"[yellow]ℹ[/yellow] {title} (basic): {instruction_file}")
             
             # Write report to the analyzed repository
             write_report(stack, findings, risk, config, str(repo))

@@ -1,7 +1,7 @@
 """LLM client for generating Copilot instructions."""
 import os
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from openai import OpenAI
 from core.config import Config
 from core.best_practices.loader import BestPracticesLoader
@@ -32,15 +32,21 @@ class LLMClient:
         
         logger.debug(f"Initialized LLM client with model: {self.model}")
 
-    def generate_instructions(self, stack: Dict[str, Any], rules: List[str]) -> str:
-        """Generate GitHub Copilot instructions from stack and rules.
+    def generate_instructions(
+        self, 
+        stack: Dict[str, Any], 
+        rules: List[str],
+        findings: Optional[List[Dict[str, Any]]] = None
+    ) -> Dict[str, str]:
+        """Generate categorized GitHub Copilot instructions from stack and rules.
         
         Args:
             stack: Detected tech stack information
             rules: List of rules/constraints to enforce
+            findings: Optional list of findings from analysis
         
         Returns:
-            Generated Copilot instructions as markdown string
+            Dictionary mapping category names to instruction content
         
         Raises:
             Exception: If API call fails
@@ -48,93 +54,185 @@ class LLMClient:
         if not rules:
             logger.warning("No rules provided, generating generic instructions")
         
-        prompt = self._build_prompt(stack, rules)
+        findings = findings or []
         
-        try:
-            logger.info(f"Generating Copilot instructions using {self.model}")
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are an expert at writing GitHub Copilot instruction files. Generate clear, enforceable rules only."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-            )
-            
-            instructions = response.choices[0].message.content
-            logger.info("Successfully generated Copilot instructions")
-            return instructions or ""
-            
-        except Exception as e:
-            error_msg = str(e)
-            
-            # Handle specific API errors with helpful messages
-            if "insufficient_quota" in error_msg or "429" in error_msg:
-                logger.error("OpenAI API quota exceeded. Please check your billing and plan.")
-                raise RuntimeError(
-                    "OpenAI API quota exceeded. Please:\n"
-                    "1. Check your OpenAI account billing and plan\n"
-                    "2. Visit https://platform.openai.com/account/billing\n"
-                    "3. Or use the --skip-llm flag to generate rules without AI instructions"
-                ) from e
-            elif "invalid_api_key" in error_msg or "401" in error_msg:
-                logger.error("Invalid OpenAI API key")
-                raise RuntimeError(
-                    "Invalid OpenAI API key. Please:\n"
-                    "1. Check your OPENAI_API_KEY environment variable\n"
-                    "2. Get a key from https://platform.openai.com/api-keys\n"
-                    "3. Or use the --skip-llm flag to skip AI generation"
-                ) from e
-            else:
-                logger.error(f"Failed to generate instructions: {e}")
-                raise RuntimeError(f"LLM API call failed: {e}") from e
+        # Check if caching is present
+        from core.instructions.generator import InstructionGenerator
+        generator = InstructionGenerator(stack.get("language", ""))
+        has_caching = generator._detect_caching(findings, rules, stack)
+        
+        # Generate instructions for each category
+        categories = ["design", "api", "security", "data-access", "testing", "logging"]
+        if has_caching:
+            categories.append("caching")
+        
+        instructions = {}
+        
+        for category in categories:
+            try:
+                prompt = self._build_category_prompt(category, stack, rules, findings)
+                
+                logger.info(f"Generating {category} instructions using {self.model}")
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": f"You are an expert at writing GitHub Copilot instruction files for {category}. Generate clear, detailed, enforceable rules based on best practices."
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens,
+                )
+                
+                category_instructions = response.choices[0].message.content
+                if category_instructions:
+                    instructions[category] = category_instructions
+                    logger.debug(f"Generated {category} instructions")
+            except Exception as e:
+                error_msg = str(e)
+                # Handle specific API errors
+                if "insufficient_quota" in error_msg or "429" in error_msg:
+                    logger.error(f"OpenAI API quota exceeded for {category}")
+                    raise RuntimeError(
+                        "OpenAI API quota exceeded. Please:\n"
+                        "1. Check your OpenAI account billing and plan\n"
+                        "2. Visit https://platform.openai.com/account/billing\n"
+                        "3. Or use the --skip-llm flag to generate rules without AI instructions"
+                    ) from e
+                elif "invalid_api_key" in error_msg or "401" in error_msg:
+                    logger.error(f"Invalid OpenAI API key for {category}")
+                    raise RuntimeError(
+                        "Invalid OpenAI API key. Please:\n"
+                        "1. Check your OPENAI_API_KEY environment variable\n"
+                        "2. Get a key from https://platform.openai.com/api-keys\n"
+                        "3. Or use the --skip-llm flag to skip AI generation"
+                    ) from e
+                else:
+                    logger.warning(f"Failed to generate {category} instructions: {e}")
+                    continue
+        
+        logger.info(f"Successfully generated {len(instructions)} category instruction files")
+        return instructions
     
-    def _build_prompt(self, stack: Dict[str, Any], rules: List[str]) -> str:
-        """Build the prompt for instruction generation."""
+    def _build_category_prompt(
+        self, 
+        category: str,
+        stack: Dict[str, Any], 
+        rules: List[str],
+        findings: List[Dict[str, Any]]
+    ) -> str:
+        """Build the prompt for category-specific instruction generation."""
         language = stack.get('language', 'Unknown')
-        rules_text = "\n".join(f"- {rule}" for rule in rules) if rules else "None specified"
         
-        # Load best practices for context
+        # Category mapping
+        category_map = {
+            "design": ["Architecture", "Code Quality"],
+            "api": ["Architecture", "Security"],
+            "security": ["Security"],
+            "data-access": ["Architecture", "Security"],
+            "caching": ["Performance"],
+            "testing": ["Code Quality"],
+            "logging": ["Code Quality"],
+        }
+        
+        # Filter findings for this category
+        relevant_categories = category_map.get(category, [])
+        category_findings = [
+            f for f in findings 
+            if f.get("category") in relevant_categories
+        ]
+        
+        # Filter rules for this category
+        category_keywords = {
+            "design": ["architecture", "design", "pattern", "controller", "service"],
+            "api": ["api", "endpoint", "controller", "route", "http"],
+            "security": ["security", "secure", "vulnerability", "injection", "authentication"],
+            "data-access": ["database", "data", "repository", "query", "entity", "dbcontext"],
+            "caching": ["cache", "performance", "optimize"],
+            "testing": ["test", "unit", "integration", "mock"],
+            "logging": ["log", "logger", "trace", "debug"],
+        }
+        
+        keywords = category_keywords.get(category, [])
+        category_rules = [
+            rule for rule in rules
+            if any(keyword in rule.lower() for keyword in keywords)
+        ]
+        
+        # Load best practices for this category
         best_practices_context = ""
         try:
             loader = BestPracticesLoader()
             practices = loader.load_practices(language)
             
-            practices_rules = practices.get("rules", [])
-            if practices_rules:
-                best_practices_context = "\n\nBest Practices for " + language + ":\n"
-                best_practices_context += "\n".join(f"- {rule}" for rule in practices_rules[:10])  # Limit to 10
+            # Get category-specific practices
+            practices_categories = {
+                "design": ["architecture", "code_quality"],
+                "api": ["architecture"],
+                "security": ["security"],
+                "data-access": ["architecture", "security"],
+                "caching": ["performance"],
+                "testing": ["code_quality"],
+                "logging": ["code_quality"],
+            }
             
+            relevant_practice_cats = practices_categories.get(category, [])
             categories = practices.get("categories", {})
-            if categories:
-                best_practices_context += "\n\nKey Practice Categories:\n"
-                for cat_name, cat_info in list(categories.items())[:5]:  # Limit to 5 categories
-                    desc = cat_info.get("description", cat_name)
-                    best_practices_context += f"- {cat_name}: {desc}\n"
+            
+            for cat_name in relevant_practice_cats:
+                if cat_name in categories:
+                    cat_info = categories[cat_name]
+                    best_practices_context += f"\n### {cat_name.title()} Practices:\n"
+                    best_practices_context += f"{cat_info.get('description', '')}\n"
+                    for practice in cat_info.get("practices", []):
+                        best_practices_context += f"- {practice}\n"
         except Exception as e:
-            logger.debug(f"Could not load best practices for prompt: {e}")
+            logger.debug(f"Could not load best practices for {category}: {e}")
         
-        return f"""Tech stack: {language} (confidence: {stack.get('confidence', 0)})
+        category_titles = {
+            "design": "Design & Architecture",
+            "api": "API Development",
+            "security": "Security",
+            "data-access": "Data Access",
+            "caching": "Caching",
+            "testing": "Testing",
+            "logging": "Logging",
+        }
+        
+        category_title = category_titles.get(category, category.title())
+        
+        findings_text = ""
+        if category_findings:
+            findings_text = f"\n\nIssues found in codebase ({len(category_findings)}):\n"
+            for finding in category_findings[:5]:
+                findings_text += f"- {finding.get('pattern', 'Unknown')} ({finding.get('severity', 'UNKNOWN')})\n"
+        
+        rules_text = "\n".join(f"- {rule}" for rule in category_rules) if category_rules else "None specific to this category"
+        
+        return f"""Generate a detailed GitHub Copilot instruction file for {category_title} in a {language} project.
 
-Rules and constraints to enforce (based on code analysis):
+Tech stack: {language} (confidence: {stack.get('confidence', 0):.0%})
+Category: {category_title}
+{findings_text}
+
+Rules and constraints for {category}:
 {rules_text}
 {best_practices_context}
 
-Generate a GitHub Copilot instructions file (.github/copilot-instructions.md format).
 Requirements:
-- No explanations or commentary
-- Only enforceable rules and constraints
-- Clear, actionable directives
+- Create a comprehensive, detailed instruction file
+- Include best practices specific to {category} for {language}
+- Provide clear, actionable, enforceable rules
+- Include examples where helpful
 - Format as proper markdown
-- Focus on preventing the issues found in the codebase
-- Incorporate the best practices for {language}
-- Be specific to the {language} stack and framework patterns
-- Prioritize critical security and architectural constraints
+- Be specific to {language} frameworks and patterns
+- Cover all aspects of {category} development
+- Prioritize critical issues found in the codebase
+
+Generate the complete instruction file content (markdown format) that will be saved as .github/copilot-instructions-{category}.md
 """
